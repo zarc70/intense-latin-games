@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arena of the Dimachaerus</title>
+    <link rel="stylesheet" href="tailwind.css">
+    
+    <style>
+        :root {
+            --blood-red: #8a0303;
+            --roman-gold: #d4af37;
+            --arena-sand: #e6c280;
+        }
+
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            overflow: hidden; /* Prevent scrolling during intense gameplay */
+            touch-action: manipulation;
+        }
+
+        .font-cinzel {
+            font-family: Georgia, 'Times New Roman', serif;
+        }
+
+        /* Background Pattern - Colosseum feel */
+        .arena-bg {
+            background: linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.9)), 
+                        url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="%23222"/><path d="M0 0L50 50L100 0L100 100L50 50L0 100Z" fill="%23333" fill-opacity="0.2"/></svg>');
+            background-size: cover;
+            background-position: center;
+        }
+
+        /* Animations */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .animate-shake {
+            animation: shake 0.4s;
+        }
+
+        @keyframes flashRed {
+            0% { background-color: transparent; }
+            50% { background-color: rgba(220, 38, 38, 0.6); }
+            100% { background-color: transparent; }
+        }
+
+        .animate-flash-red {
+            animation: flashRed 0.4s ease-out;
+        }
+
+        @keyframes flashBlue {
+            0% { filter: drop-shadow(0 0 0px #3b82f6); }
+            50% { filter: drop-shadow(0 0 20px #3b82f6); transform: scale(1.05); }
+            100% { filter: drop-shadow(0 0 0px #3b82f6); transform: scale(1); }
+        }
+
+        .animate-flash-blue {
+            animation: flashBlue 0.4s ease-out;
+        }
+
+        @keyframes pulseGold {
+            0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(212, 175, 55, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+        }
+
+        .pulse-gold {
+            animation: pulseGold 2s infinite;
+        }
+
+        /* Custom Input Styling */
+        .type-input {
+            text-transform: lowercase;
+            caret-color: var(--roman-gold);
+        }
+        
+        .type-input:focus {
+            outline: none;
+            box-shadow: 0 0 15px var(--roman-gold);
+            border-color: var(--roman-gold);
+        }
+
+        /* Timer Bar Gradient */
+        .timer-safe { background: linear-gradient(90deg, #10b981, #34d399); }
+        .timer-warn { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .timer-danger { background: linear-gradient(90deg, #ef4444, #f87171); }
+        
+        .health-heart {
+            color: #ef4444;
+            text-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+        }
+
+        .heart-icon { font-style: normal; line-height: 1; }
+        .heart-empty { color: #374151; text-shadow: none; }
+        .arcade-home-link {
+            display: inline-block;
+            margin-bottom: 0.75rem;
+            color: #facc15;
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-decoration: none;
+            text-transform: uppercase;
+        }
+        .arcade-home-link:hover,
+        .arcade-home-link:focus-visible { color: #fef08a; text-decoration: underline; }
+
+        @media (max-width: 640px), (max-height: 720px) {
+            body { overflow: auto; min-height: 100dvh; }
+            #start-screen, #game-over-screen { position: fixed; overflow-y: auto; align-items: flex-start; padding: 1rem; }
+            #start-screen > div, #game-over-screen > div { margin: auto; padding: 1.25rem; }
+            #start-screen h1 { font-size: 2rem; margin-bottom: 1rem; }
+            #start-screen .text-lg { font-size: 0.95rem; }
+            #start-screen .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.6rem; }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen arena-bg flex flex-col items-center justify-center relative">
+
+    <!-- Screen Flash Overlay for damage -->
+    <div id="damageOverlay" class="absolute inset-0 pointer-events-none z-50"></div>
+
+    <!-- Header -->
+    <header class="absolute top-0 w-full p-4 flex justify-between items-center bg-black/60 border-b border-yellow-700/50 z-10">
+        <div class="text-xl font-cinzel font-bold text-yellow-500 tracking-wider">
+            <span aria-hidden="true" class="mr-2">⚔</span> DIMACHAERUS
+        </div>
+        <div id="game-status" class="text-lg font-bold text-gray-300">
+            Speed: <span id="current-speed-display" class="text-yellow-400">5.0</span>s
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main id="game-container" class="w-full max-w-5xl mx-auto px-4 flex flex-col h-full justify-center pt-16 pb-8 hidden">
+        
+        <!-- Arena Layout -->
+        <div class="flex-1 flex flex-col md:flex-row items-center justify-between gap-4 mb-4 mt-4">
+            
+            <!-- Player Side -->
+            <div id="player-box" class="flex flex-col items-center bg-gray-900/80 p-4 rounded-lg border-2 border-gray-700 w-full md:w-1/4 transition-all duration-300">
+                <h2 class="font-cinzel text-xl font-bold text-white mb-2">You</h2>
+                <div class="text-gray-400 mb-1 text-sm">Lives Remaining</div>
+                <div id="player-lives" class="flex flex-wrap justify-center gap-1 text-lg health-heart">
+                    <!-- Hearts generated by JS -->
+                </div>
+            </div>
+
+            <!-- Center Action Area & Canvas -->
+            <div class="flex flex-col items-center justify-center w-full md:w-1/2 z-10 min-w-[300px]">
+                
+                <!-- Graphics Canvas -->
+                <div class="w-full h-48 md:h-64 bg-[#1a1311] rounded-xl border-2 border-yellow-700/50 mb-4 relative overflow-hidden shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]">
+                    <canvas id="arenaCanvas" class="w-full h-full absolute inset-0"></canvas>
+                </div>
+
+                <div id="action-prompt" class="font-cinzel text-3xl font-black mb-2 tracking-widest text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]">
+                    STRIKE!
+                </div>
+
+                <div class="bg-black/80 p-4 rounded-xl border border-yellow-600/50 w-full text-center mb-4 shadow-[0_0_20px_rgba(0,0,0,0.8)]">
+                    <div id="english-phrase" class="text-gray-300 text-lg md:text-xl mb-2 font-bold tracking-wider uppercase">We were loving</div>
+                    <div class="flex justify-center items-end gap-1">
+                        <span id="verb-stem" class="font-cinzel text-3xl md:text-4xl font-bold text-white tracking-wider text-right">ama</span>
+                        <input type="text" id="type-input" autocomplete="off" spellcheck="false" autofocus
+                            class="type-input bg-gray-800 text-yellow-500 font-bold text-2xl md:text-3xl p-1 rounded-lg border-b-4 border-gray-600 focus:border-yellow-500 w-24 md:w-32 text-left focus:outline-none transition-colors"
+                            placeholder="...">
+                    </div>
+                </div>
+
+                <!-- Timer Bar -->
+                <div class="w-full bg-gray-800 rounded-full h-6 border border-gray-700 relative overflow-hidden">
+                    <div id="timer-bar" class="h-full timer-safe w-full flex items-center justify-center text-black font-bold transition-none text-sm">
+                        <span id="timer-text" class="absolute z-10">5.0s</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enemy Side -->
+            <div id="enemy-box" class="flex flex-col items-center bg-gray-900/80 p-4 rounded-lg border-2 border-red-900/50 w-full md:w-1/4 transition-all duration-300">
+                <h2 id="enemy-name" class="font-cinzel text-xl font-bold text-red-400 mb-2">Retiarius</h2>
+                <div class="text-gray-400 mb-1 text-sm">Enemy Lives</div>
+                <div id="enemy-lives" class="flex flex-wrap justify-center gap-1 text-lg text-red-600">
+                    <!-- Hearts generated by JS -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="absolute inset-0 flex items-center justify-center bg-black/90 z-40 backdrop-blur-sm">
+        <div class="bg-gray-900 p-8 rounded-xl border-2 border-yellow-600 max-w-2xl text-center shadow-[0_0_30px_rgba(212,175,55,0.2)]">
+            <a href="../" class="arcade-home-link">← All games</a>
+            <h1 class="font-cinzel text-5xl font-black text-yellow-500 mb-6 drop-shadow-md">Arena of the Dimachaerus</h1>
+            
+            <div class="text-left text-gray-300 mb-8 space-y-4 text-lg">
+                <p>Welcome to the sands, Gladiator. You wield two swords. To survive, you must master the <strong>Imperfect Tense</strong> Latin verb endings.</p>
+                <ul class="list-disc pl-6 space-y-2">
+                    <li>Read the English phrase (e.g., <strong>"we were loving"</strong>).</li>
+                    <li>Complete the Latin stem (e.g., <strong>"ama"</strong>) by typing the correct imperfect ending (e.g., <strong>"bamus"</strong>).</li>
+                    <li>Press <strong class="text-yellow-400">ENTER</strong> or wait for the timer to expire to strike or block!</li>
+                    <li><strong class="text-red-400">Odd attempts (STRIKE):</strong> Success makes the timer <span class="text-yellow-400">0.1s faster</span>. Failure costs a life.</li>
+                    <li><strong class="text-blue-400">Even attempts (BLOCK):</strong> Type correctly to defend. Failure costs a life.</li>
+                </ul>
+                <p>You have 10 lives. The timer starts at 5.0 seconds and floors at 0.3s. Eventually, you will lose... but how many can you defeat?</p>
+            </div>
+
+            <button id="start-btn" class="pulse-gold bg-yellow-600 hover:bg-yellow-500 text-black font-cinzel font-bold text-2xl py-4 px-12 rounded-full transition-colors duration-200">
+                ENTER THE ARENA
+            </button>
+        </div>
+    </div>
+
+    <!-- Message Overlay (for level transitions) -->
+    <div id="message-overlay" class="absolute inset-0 flex items-center justify-center bg-black/80 z-30 hidden backdrop-blur-sm">
+        <h2 id="message-text" class="font-cinzel text-6xl font-bold text-yellow-500 animate-pulse text-center px-4">
+            VICTORY!
+        </h2>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="absolute inset-0 flex items-center justify-center bg-black/95 z-50 hidden backdrop-blur-md">
+        <div class="text-center">
+            <h1 class="font-cinzel text-7xl font-black text-red-600 mb-4 drop-shadow-[0_0_20px_rgba(220,38,38,0.6)]">THE CROWD WEEPS</h1>
+            <p id="death-stats" class="text-2xl text-gray-400 mb-8 font-cinzel">You fell to the <span id="killer-name" class="text-red-400">Murmillo</span></p>
+            <button id="restart-btn" class="bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white font-cinzel font-bold text-xl py-3 px-8 rounded transition-colors duration-200">
+                Fight Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Game Constants & Data ---
+        const VOCABULARY = [
+            // Imperfect Tense Only
+            { english: 'I was loving', stem: 'ama', ending: 'bam' },
+            { english: 'you (sg) were loving', stem: 'ama', ending: 'bas' },
+            { english: 'he was loving', stem: 'ama', ending: 'bat' },
+            { english: 'we were loving', stem: 'ama', ending: 'bamus' },
+            { english: 'you (pl) were loving', stem: 'ama', ending: 'batis' },
+            { english: 'they were loving', stem: 'ama', ending: 'bant' },
+            { english: 'I was walking', stem: 'ambula', ending: 'bam' },
+            { english: 'you (sg) were walking', stem: 'ambula', ending: 'bas' },
+            { english: 'she was walking', stem: 'ambula', ending: 'bat' },
+            { english: 'we were walking', stem: 'ambula', ending: 'bamus' },
+            { english: 'you (pl) were walking', stem: 'ambula', ending: 'batis' },
+            { english: 'they were walking', stem: 'ambula', ending: 'bant' },
+            { english: 'I was carrying', stem: 'porta', ending: 'bam' },
+            { english: 'you (sg) were carrying', stem: 'porta', ending: 'bas' },
+            { english: 'it was carrying', stem: 'porta', ending: 'bat' },
+            { english: 'we were carrying', stem: 'porta', ending: 'bamus' },
+            { english: 'you (pl) were carrying', stem: 'porta', ending: 'batis' },
+            { english: 'they were carrying', stem: 'porta', ending: 'bant' }
+        ];
+
+        const ENEMIES = [
+            { name: 'Retiarius', lives: 5, color: 'text-blue-400' },
+            { name: 'Samnite', lives: 10, color: 'text-green-500' },
+            { name: 'Murmillo', lives: 15, color: 'text-purple-500' },
+            { name: 'Scissor', lives: 20, color: 'text-gray-400' },
+            { name: 'CHAMPION', lives: 100, color: 'text-yellow-500' }
+        ];
+
+        // --- Game State Variables ---
+        let baseTimer = 5.0;
+        let currentTimer = 5.0;
+        let minTimer = 0.3;
+        
+        let playerMaxLives = 10;
+        let playerLives = 10;
+        
+        let enemyIndex = 0;
+        let currentEnemyLives = 0;
+        
+        let attemptCount = 1; // Odd = Strike, Even = Block
+        let isStrike = true;
+        let isTransitioning = false;
+        
+        let currentTarget = null;
+        let gameActive = false;
+        let animationFrameId = null;
+        let lastTime = 0;
+
+        // --- Canvas Graphics Variables ---
+        let canvasCtx = null;
+        let cWidth = 0, cHeight = 0;
+        let playerAnimState = { action: 'idle', timer: 0 };
+        let enemyAnimState = { action: 'idle', timer: 0 };
+
+        // --- DOM Elements ---
+        const els = {
+            startScreen: document.getElementById('start-screen'),
+            gameContainer: document.getElementById('game-container'),
+            gameOverScreen: document.getElementById('game-over-screen'),
+            messageOverlay: document.getElementById('message-overlay'),
+            messageText: document.getElementById('message-text'),
+            
+            startBtn: document.getElementById('start-btn'),
+            restartBtn: document.getElementById('restart-btn'),
+            
+            playerLives: document.getElementById('player-lives'),
+            enemyLives: document.getElementById('enemy-lives'),
+            enemyName: document.getElementById('enemy-name'),
+            
+            actionPrompt: document.getElementById('action-prompt'),
+            englishPhrase: document.getElementById('english-phrase'),
+            verbStem: document.getElementById('verb-stem'),
+            typeInput: document.getElementById('type-input'),
+            
+            arenaCanvas: document.getElementById('arenaCanvas'),
+            
+            timerBar: document.getElementById('timer-bar'),
+            timerText: document.getElementById('timer-text'),
+            currentSpeedDisplay: document.getElementById('current-speed-display'),
+            
+            playerBox: document.getElementById('player-box'),
+            enemyBox: document.getElementById('enemy-box'),
+            damageOverlay: document.getElementById('damageOverlay'),
+            
+            killerName: document.getElementById('killer-name')
+        };
+
+        // --- STREAMING_CHUNK:Core Game Logic and Initialization... ---
+        
+        function initCanvas() {
+            if (!els.arenaCanvas) return;
+            canvasCtx = els.arenaCanvas.getContext('2d');
+            const rect = els.arenaCanvas.parentElement.getBoundingClientRect();
+            els.arenaCanvas.width = rect.width;
+            els.arenaCanvas.height = rect.height;
+            cWidth = rect.width;
+            cHeight = rect.height;
+        }
+
+        window.addEventListener('resize', initCanvas);
+
+        function initGame() {
+            // Reset Stats
+            baseTimer = 5.0;
+            playerLives = playerMaxLives;
+            enemyIndex = 0;
+            attemptCount = 1;
+            gameActive = true;
+            isTransitioning = false;
+            
+            els.currentSpeedDisplay.innerText = baseTimer.toFixed(1);
+            
+            // UI setup
+            els.startScreen.classList.add('hidden');
+            els.gameOverScreen.classList.add('hidden');
+            els.gameContainer.classList.remove('hidden');
+            
+            initCanvas();
+            renderPlayerLives();
+            loadEnemy();
+            
+            // Start first turn
+            lastTime = performance.now();
+            startTurn();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function loadEnemy() {
+            if (enemyIndex >= ENEMIES.length) {
+                showVictory();
+                return;
+            }
+            const enemy = ENEMIES[enemyIndex];
+            currentEnemyLives = enemy.lives;
+            els.enemyName.innerText = enemy.name;
+            els.enemyName.className = `font-cinzel text-xl font-bold mb-2 ${enemy.color}`;
+            renderEnemyLives();
+        }
+
+        function renderPlayerLives() {
+            els.playerLives.innerHTML = '';
+            for(let i=0; i<playerMaxLives; i++) {
+                const heart = document.createElement('span');
+                heart.className = i < playerLives ? "heart-icon" : "heart-icon heart-empty";
+                heart.textContent = i < playerLives ? '♥' : '♡';
+                heart.setAttribute('aria-hidden', 'true');
+                els.playerLives.appendChild(heart);
+            }
+        }
+
+        function renderEnemyLives() {
+            const enemy = ENEMIES[enemyIndex];
+            els.enemyLives.innerHTML = '';
+            
+            // If champion, group lives to save space, else show individual icons
+            if (enemy.lives > 20) {
+                els.enemyLives.innerHTML = `<span class="text-2xl font-bold">${currentEnemyLives} / ${enemy.lives}</span> <span class="heart-icon text-xl ml-2 pt-1" aria-hidden="true">♥</span>`;
+            } else {
+                for(let i=0; i<enemy.lives; i++) {
+                    const heart = document.createElement('span');
+                    heart.className = i < currentEnemyLives ? "heart-icon" : "heart-icon heart-empty";
+                    heart.textContent = i < currentEnemyLives ? '♥' : '♡';
+                    heart.setAttribute('aria-hidden', 'true');
+                    els.enemyLives.appendChild(heart);
+                }
+            }
+        }
+
+        // --- STREAMING_CHUNK:Turn Management and Gameplay Loop... ---
+
+        function startTurn() {
+            isStrike = attemptCount % 2 !== 0;
+            currentTimer = baseTimer;
+            
+            // Pick random word
+            currentTarget = VOCABULARY[Math.floor(Math.random() * VOCABULARY.length)];
+            
+            // Update UI for turn type
+            els.englishPhrase.innerText = currentTarget.english;
+            els.verbStem.innerText = currentTarget.stem;
+            els.typeInput.value = '';
+            els.typeInput.focus();
+            
+            if (isStrike) {
+                els.actionPrompt.innerText = "STRIKE!";
+                els.actionPrompt.className = "font-cinzel text-3xl font-black mb-2 tracking-widest text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]";
+            } else {
+                els.actionPrompt.innerText = "BLOCK!";
+                els.actionPrompt.className = "font-cinzel text-3xl font-black mb-2 tracking-widest text-blue-500 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]";
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameActive) return;
+
+            const deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            if (!isTransitioning) {
+                currentTimer -= deltaTime;
+                updateTimerUI();
+
+                if (currentTimer <= 0) {
+                    // Time ran out, validate current input
+                    const val = els.typeInput.value.trim().toLowerCase();
+                    handleTurnEnd(val === currentTarget.ending);
+                }
+            }
+
+            drawArenaGraphics(deltaTime);
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function updateTimerUI() {
+            const percentage = Math.max(0, (currentTimer / baseTimer) * 100);
+            els.timerBar.style.width = `${percentage}%`;
+            els.timerText.innerText = currentTimer.toFixed(1) + 's';
+
+            // Change colors based on remaining time percentage
+            els.timerBar.className = "h-full w-full flex items-center justify-center text-black font-bold transition-none text-sm ";
+            if (percentage > 60) {
+                els.timerBar.classList.add('timer-safe');
+            } else if (percentage > 30) {
+                els.timerBar.classList.add('timer-warn');
+            } else {
+                els.timerBar.classList.add('timer-danger');
+            }
+        }
+
+        // --- STREAMING_CHUNK:Canvas Rendering & Animation Logic... ---
+
+        let spriteSheetCanvas;
+
+        function initSpritesheet() {
+            // Create the in-memory spritesheet canvas
+            spriteSheetCanvas = document.createElement('canvas');
+            spriteSheetCanvas.width = 480;  // 4 animation states (cols) * 120px
+            spriteSheetCanvas.height = 720; // 6 characters (rows) * 120px
+            const ctx = spriteSheetCanvas.getContext('2d', { willReadFrequently: true });
+            
+            const characters = ['Player', 'Retiarius', 'Samnite', 'Murmillo', 'Scissor', 'CHAMPION'];
+            const states = ['idle', 'strike', 'block', 'hurt'];
+
+            for(let r = 0; r < characters.length; r++) {
+                for(let c = 0; c < states.length; c++) {
+                    drawCharacterToSheet(ctx, c * 120 + 60, r * 120 + 110, characters[r], states[c]);
+                }
+            }
+        }
+
+        function drawCharacterToSheet(ctx, cx, cy, char, state) {
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            // Skeletal Animation Logic based on State
+            let lean = 0, fArmAngle = 0, bArmAngle = 0, scaleY = 1, hurtOff = 0;
+            
+            if (state === 'idle') { 
+                scaleY = 0.96; fArmAngle = -0.15; bArmAngle = 0.15; 
+            } else if (state === 'strike') { 
+                lean = 0.25; fArmAngle = -Math.PI/1.5; bArmAngle = Math.PI/4; 
+            } else if (state === 'block') { 
+                lean = -0.1; fArmAngle = -Math.PI/4; bArmAngle = -Math.PI/4; 
+            } else if (state === 'hurt') { 
+                lean = -0.3; fArmAngle = 0.5; bArmAngle = 0.5; hurtOff = -15; 
+                ctx.filter = 'brightness(1.5) sepia(1) hue-rotate(-50deg) saturate(3)'; 
+            }
+
+            ctx.translate(hurtOff, 0); 
+            ctx.rotate(lean); 
+            ctx.scale(1, scaleY);
+
+            // Thematic Color Palette
+            const colors = {
+                skin: '#c28e62',
+                metal: '#94a3b8',
+                darkMetal: '#475569',
+                leather: '#78350f',
+                wood: '#451a03',
+                gold: '#fbbf24',
+                plume: '#ef4444' // Default red enemy plume
+            };
+            if (char === 'Player') colors.plume = '#3b82f6'; // Dimachaerus Blue
+            if (char === 'Samnite') colors.plume = '#22c55e'; // Green
+            if (char === 'Murmillo') colors.plume = '#a855f7'; // Purple
+            if (char === 'CHAMPION') { colors.metal = '#fbbf24'; colors.darkMetal = '#b45309'; colors.skin = '#4b5563'; colors.plume = '#ef4444'; }
+
+            // DRAW BACK ARM
+            drawArm(ctx, -10, -50, bArmAngle, char, state, true, colors);
+
+            // LEGS (Flesh and Greaves)
+            ctx.fillStyle = colors.skin; 
+            ctx.fillRect(-10, -25, 8, 25); 
+            ctx.fillRect(2, -25, 8, 25); 
+            
+            if (char !== 'Retiarius') { // Retiarius is lightly armored
+                ctx.fillStyle = colors.metal; ctx.fillRect(1, -20, 10, 15); 
+                ctx.fillStyle = colors.plume; ctx.fillRect(1, -18, 10, 3);
+                if (char === 'Scissor' || char === 'CHAMPION') { 
+                    ctx.fillStyle = colors.metal; ctx.fillRect(-11, -20, 10, 15); 
+                }
+            }
+
+            // TORSO
+            ctx.fillStyle = colors.skin; ctx.fillRect(-12, -55, 24, 30);
+            
+            // Belt and Loincloth (Subligaculum)
+            ctx.fillStyle = colors.leather; ctx.fillRect(-13, -30, 26, 8);
+            ctx.fillStyle = colors.plume; ctx.fillRect(-6, -22, 12, 16);
+            
+            // Chest Armor
+            if (char !== 'Retiarius') {
+                ctx.fillStyle = colors.metal; ctx.fillRect(-12, -55, 24, 18);
+                ctx.fillStyle = colors.darkMetal; ctx.fillRect(-12, -37, 24, 5); 
+            }
+
+            // HEAD
+            ctx.fillStyle = colors.skin; ctx.beginPath(); ctx.arc(0, -65, 12, 0, Math.PI*2); ctx.fill();
+            
+            // DISTINCT HELMETS
+            if (char === 'Player') {
+                ctx.fillStyle = colors.gold; ctx.beginPath(); ctx.arc(0, -67, 14, 0, Math.PI, true); ctx.fill();
+                ctx.fillRect(-14, -67, 28, 10); ctx.fillStyle = '#000'; ctx.fillRect(4, -65, 8, 4); // Eye slit
+            } else if (char === 'Retiarius') {
+                ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(0, -68, 12, 0, Math.PI, true); ctx.fill(); // Just Hair
+            } else if (char === 'Samnite') {
+                ctx.fillStyle = colors.metal; ctx.beginPath(); ctx.arc(0, -65, 15, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = colors.plume; ctx.beginPath(); ctx.arc(0, -85, 10, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#000'; ctx.fillRect(6, -65, 6, 4);
+            } else if (char === 'Murmillo') {
+                ctx.fillStyle = colors.metal; ctx.beginPath(); ctx.arc(0, -65, 14, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = colors.darkMetal; ctx.beginPath(); ctx.moveTo(-15, -65); ctx.lineTo(0, -90); ctx.lineTo(15, -65); ctx.fill(); // Fish Fin
+                ctx.fillStyle = '#000'; ctx.fillRect(6, -65, 6, 4);
+            } else if (char === 'Scissor') {
+                ctx.fillStyle = colors.darkMetal; ctx.fillRect(-14, -77, 28, 24);
+                ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(6, -63, 3, 0, Math.PI*2); ctx.fill();
+            } else if (char === 'CHAMPION') {
+                ctx.fillStyle = colors.metal; ctx.beginPath(); ctx.arc(0, -67, 16, 0, Math.PI, true); ctx.fill();
+                ctx.fillRect(-16, -67, 32, 12); ctx.fillStyle = colors.plume; ctx.fillRect(-5, -100, 10, 33);
+                ctx.fillStyle = '#000'; ctx.fillRect(4, -65, 10, 5);
+            }
+
+            // DRAW FRONT ARM
+            drawArm(ctx, 10, -50, fArmAngle, char, state, false, colors);
+
+            ctx.restore();
+        }
+
+        function drawArm(ctx, x, y, angle, char, state, isBack, colors) {
+            ctx.save();
+            ctx.translate(x, y); 
+            ctx.rotate(angle);
+
+            // Shoulder & Arm Structure
+            if (char === 'Retiarius' && !isBack) {
+                // Galerus (shield on shoulder)
+                ctx.fillStyle = colors.metal; ctx.fillRect(-4, -5, 12, 18);
+            } else if (char === 'Scissor' && !isBack) {
+                // Steel tube arm
+                ctx.fillStyle = colors.metal; ctx.fillRect(-4, 0, 8, 25);
+            } else {
+                ctx.fillStyle = colors.skin; ctx.fillRect(-3, 0, 6, 22);
+                ctx.fillStyle = colors.metal; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI, true); ctx.fill();
+            }
+
+            // Weapons
+            ctx.translate(0, 22); // Move origin to hand
+
+            if (char === 'Player') {
+                // Dimachaerus Dual Swords
+                ctx.fillStyle = colors.metal; ctx.fillRect(-2, -5, 4, 35); 
+                ctx.fillStyle = colors.leather; ctx.fillRect(-3, -5, 6, 8);
+            } else if (char === 'Retiarius') {
+                if (!isBack) {
+                    // Trident
+                    ctx.fillStyle = colors.wood; ctx.fillRect(-1, -15, 2, 60); 
+                    ctx.fillStyle = colors.metal; ctx.fillRect(-10, 40, 20, 3); 
+                    ctx.fillRect(-10, 40, 2, 15); ctx.fillRect(-1, 40, 2, 18); ctx.fillRect(8, 40, 2, 15);
+                } else {
+                    // Net
+                    ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 1; 
+                    ctx.beginPath(); 
+                    for(let i=0; i<4; i++){ ctx.moveTo(0,0); ctx.lineTo(-20+i*15, 20); ctx.lineTo(-10+i*10, 35); } 
+                    ctx.stroke();
+                }
+            } else if (char === 'Samnite' || char === 'Murmillo') {
+                if (!isBack) {
+                    // Gladius (Sword)
+                    ctx.fillStyle = colors.metal; ctx.fillRect(-2, 0, 4, 25); 
+                    ctx.fillStyle = colors.leather; ctx.fillRect(-3, -5, 6, 5); 
+                } else {
+                    // Scutum (Large Shield)
+                    ctx.fillStyle = colors.wood; ctx.fillRect(-5, -20, 20, 50); 
+                    ctx.fillStyle = colors.plume; ctx.fillRect(-3, -18, 16, 46);
+                    ctx.fillStyle = colors.metal; ctx.beginPath(); ctx.arc(5, 5, 6, 0, Math.PI*2); ctx.fill(); 
+                }
+            } else if (char === 'Scissor') {
+                if (!isBack) {
+                    // Crescent Scissor blade
+                    ctx.fillStyle = colors.metal; ctx.beginPath(); ctx.arc(0, 15, 20, 0, Math.PI); ctx.fill(); 
+                    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 15, 12, 0, Math.PI); ctx.fill(); 
+                } else {
+                    // Short sword
+                    ctx.fillStyle = colors.metal; ctx.fillRect(-2, 0, 4, 20); 
+                }
+            } else if (char === 'CHAMPION') {
+                if (!isBack) {
+                    // Giant Greatsword
+                    ctx.fillStyle = colors.metal; ctx.fillRect(-5, -15, 10, 55); 
+                    ctx.fillStyle = colors.darkMetal; ctx.fillRect(-10, -10, 20, 5); 
+                } else {
+                    // Sun Shield
+                    ctx.fillStyle = colors.gold; ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI*2); ctx.fill(); 
+                    ctx.fillStyle = colors.plume; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // Initialize the spritesheet in memory right away
+        initSpritesheet();
+
+        function drawArenaGraphics(dt) {
+            if (!canvasCtx) return;
+            const ctx = canvasCtx;
+            
+            // Clear Background
+            ctx.clearRect(0, 0, cWidth, cHeight);
+            
+            // Draw floor ellipse
+            ctx.fillStyle = 'rgba(74, 59, 47, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(cWidth/2, cHeight*0.85, cWidth*0.4, cHeight*0.15, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // Update timers
+            if (playerAnimState.timer > 0) playerAnimState.timer -= dt;
+            if (enemyAnimState.timer > 0) enemyAnimState.timer -= dt;
+
+            const baseY = cHeight * 0.85; // Feet on the sand
+            const pBaseX = cWidth * 0.3; // More space for huge weapons
+            const eBaseX = cWidth * 0.7;
+
+            let pX = pBaseX, pY = baseY;
+            let eX = eBaseX, eY = baseY;
+
+            // Positional Lunge Logic
+            if (playerAnimState.timer > 0) {
+                if (playerAnimState.action === 'strike') {
+                    const progress = 1 - (playerAnimState.timer / 0.5);
+                    pX += Math.sin(progress * Math.PI) * (cWidth * 0.15);
+                } else if (playerAnimState.action === 'hurt') {
+                    pX -= Math.random() * 8; 
+                }
+            }
+
+            if (enemyAnimState.timer > 0) {
+                if (enemyAnimState.action === 'strike') {
+                    const progress = 1 - (enemyAnimState.timer / 0.5);
+                    eX -= Math.sin(progress * Math.PI) * (cWidth * 0.15);
+                } else if (enemyAnimState.action === 'hurt') {
+                    eX += Math.random() * 8; 
+                }
+            }
+
+            const pState = playerAnimState.timer > 0 ? playerAnimState.action : 'idle';
+            const eState = enemyAnimState.timer > 0 ? enemyAnimState.action : 'idle';
+
+            drawSprite(ctx, 'Player', pState, pX, pY, true);
+            drawSprite(ctx, ENEMIES[enemyIndex].name, eState, eX, eY, false);
+        }
+
+        function drawSprite(ctx, charType, state, x, y, facingRight) {
+            let row = 0;
+            if (charType === 'Retiarius') row = 1;
+            if (charType === 'Samnite') row = 2;
+            if (charType === 'Murmillo') row = 3;
+            if (charType === 'Scissor') row = 4;
+            if (charType === 'CHAMPION') row = 5;
+
+            let col = 0;
+            if (state === 'idle') col = 0;
+            if (state === 'strike') col = 1;
+            if (state === 'block') col = 2;
+            if (state === 'hurt') col = 3;
+
+            const sx = col * 120;
+            const sy = row * 120;
+
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Idle breathing animation (subtle vertical bob)
+            if (state === 'idle') {
+                ctx.translate(0, Math.sin(Date.now() / 250) * 3);
+            }
+
+            if (!facingRight) {
+                ctx.scale(-1, 1);
+            }
+
+            // Global drop shadow for the sprite to make graphics pop
+            ctx.shadowColor = "rgba(0,0,0,0.6)";
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 10;
+
+            // Draw from memory spritesheet
+            ctx.drawImage(spriteSheetCanvas, sx, sy, 120, 120, -60, -120, 120, 120);
+            ctx.restore();
+        }
+
+        // --- STREAMING_CHUNK:Handling Input and Combat Resolutions... ---
+
+        els.typeInput.addEventListener('keydown', (e) => {
+            if (!gameActive || isTransitioning) return;
+            if (e.key === 'Enter') {
+                const val = e.target.value.trim().toLowerCase();
+                handleTurnEnd(val === currentTarget.ending);
+            }
+        });
+
+        // Ensure focus stays on input
+        document.addEventListener('click', () => {
+            if(gameActive && !isTransitioning) els.typeInput.focus();
+        });
+
+        function handleTurnEnd(success) {
+            isTransitioning = true;
+            els.typeInput.value = '';
+            els.typeInput.blur(); // Prevent typing during animation
+
+            let delay = 600;
+
+            if (success) {
+                if (isStrike) {
+                    // Successful Strike
+                    playerAnimState = { action: 'strike', timer: 0.5 };
+                    enemyAnimState = { action: 'hurt', timer: 0.5 };
+                    currentEnemyLives--;
+                    renderEnemyLives();
+                    triggerAnimation(els.enemyBox, 'animate-shake');
+                    
+                    // Decrease timer (Increase difficulty)
+                    baseTimer = Math.max(minTimer, Math.round((baseTimer - 0.1) * 10) / 10);
+                    els.currentSpeedDisplay.innerText = baseTimer.toFixed(1);
+                    
+                    if (currentEnemyLives <= 0) {
+                        setTimeout(() => handleEnemyDefeated(), delay);
+                        return;
+                    }
+                } else {
+                    // Successful Block
+                    enemyAnimState = { action: 'strike', timer: 0.5 };
+                    playerAnimState = { action: 'block', timer: 0.5 };
+                    triggerAnimation(els.playerBox, 'animate-flash-blue');
+                }
+            } else {
+                // Failure (on strike or block) -> Player takes damage
+                if (isStrike) {
+                    playerAnimState = { action: 'strike', timer: 0.3 };
+                    setTimeout(() => { enemyAnimState = { action: 'strike', timer: 0.4 }; }, 200);
+                } else {
+                    enemyAnimState = { action: 'strike', timer: 0.5 }; 
+                }
+                
+                setTimeout(() => { 
+                    playerAnimState = { action: 'hurt', timer: 0.3 };
+                    triggerAnimation(els.playerBox, 'animate-shake');
+                    triggerAnimation(els.damageOverlay, 'animate-flash-red');
+                }, 300);
+
+                playerLives--;
+                renderPlayerLives();
+                
+                if (playerLives <= 0) {
+                    setTimeout(() => gameOver(), delay + 200);
+                    return;
+                }
+            }
+
+            // Proceed to next turn after animation
+            setTimeout(() => {
+                attemptCount++;
+                startTurn();
+                isTransitioning = false;
+                lastTime = performance.now(); // reset delta calculation
+            }, delay);
+        }
+
+        function triggerAnimation(element, animationClass) {
+            element.classList.remove(animationClass);
+            void element.offsetWidth; // Trigger reflow
+            element.classList.add(animationClass);
+        }
+
+        // --- STREAMING_CHUNK:Level Transitions and Game Over... ---
+
+        function handleEnemyDefeated() {
+            gameActive = false;
+            els.typeInput.blur();
+            
+            const enemy = ENEMIES[enemyIndex];
+            showMessage(`Defeated ${enemy.name}!`, 1500, () => {
+                enemyIndex++;
+                if (enemyIndex >= ENEMIES.length) {
+                    showVictory();
+                } else {
+                    loadEnemy();
+                    attemptCount = 1; // Reset attempt count for new enemy (start with strike)
+                    showMessage(`Next: ${ENEMIES[enemyIndex].name}`, 1500, () => {
+                        gameActive = true;
+                        isTransitioning = false;
+                        startTurn();
+                        lastTime = performance.now();
+                        animationFrameId = requestAnimationFrame(gameLoop);
+                    });
+                }
+            });
+        }
+
+        function showMessage(text, duration, callback) {
+            els.messageText.innerText = text;
+            els.messageOverlay.classList.remove('hidden');
+            
+            setTimeout(() => {
+                els.messageOverlay.classList.add('hidden');
+                if(callback) callback();
+            }, duration);
+        }
+
+        function gameOver() {
+            gameActive = false;
+            els.typeInput.blur();
+            els.killerName.innerText = ENEMIES[enemyIndex].name;
+            els.gameOverScreen.classList.remove('hidden');
+        }
+
+        function showVictory() {
+            gameActive = false;
+            els.typeInput.blur();
+            showMessage("YOU ARE THE CHAMPION OF ROME!", 5000, () => {
+                els.startScreen.classList.remove('hidden');
+                els.gameContainer.classList.add('hidden');
+            });
+        }
+
+        // --- Event Listeners ---
+        els.startBtn.addEventListener('click', initGame);
+        els.restartBtn.addEventListener('click', initGame);
+
+    </script>
+</body>
+</html>

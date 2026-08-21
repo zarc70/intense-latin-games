@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escape From Vesuvius</title>
+    <link rel="stylesheet" href="tailwind.css">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; touch-action: manipulation; }
+        .touch-manipulation { touch-action: manipulation; }
+        .arcade-home-link {
+            display: inline-block;
+            margin-bottom: 0.65rem;
+            color: #fca5a5;
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-decoration: none;
+            text-transform: uppercase;
+        }
+        .arcade-home-link:hover,
+        .arcade-home-link:focus-visible { color: #fecaca; text-decoration: underline; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-white font-sans flex flex-col items-center justify-center p-2 md:p-4 selection:bg-red-900 selection:text-white">
+
+    <div class="max-w-4xl w-full bg-slate-900 rounded-2xl border-4 border-red-900 shadow-[0_0_40px_rgba(153,27,27,0.4)] overflow-hidden flex flex-col h-[95vh] md:h-auto relative">
+        
+        <!-- Header / HUD -->
+        <div class="bg-black p-3 md:p-4 border-b-2 border-red-900 flex justify-between items-center px-2 md:px-8 shrink-0">
+            <div class="flex items-center space-x-2 md:space-x-4">
+                <div class="text-2xl md:text-3xl">🌋</div>
+                <div>
+                    <h1 class="text-sm md:text-2xl font-black text-red-500 uppercase tracking-widest leading-tight">Vesuvius</h1>
+                    <h2 class="text-[10px] md:text-sm text-slate-400 font-bold tracking-widest hidden md:block">Perfect Tense Escape</h2>
+                </div>
+            </div>
+            
+            <div id="hud-container" class="flex space-x-2 md:space-x-4 text-center hidden">
+                <div class="bg-slate-900 p-1 md:p-2 rounded border border-red-900 min-w-[70px] md:min-w-[110px]">
+                    <div class="text-[9px] md:text-xs text-slate-400 uppercase">Cloud Gap</div>
+                    <div id="gap-hud" class="text-sm md:text-xl font-bold text-amber-500">100 m</div>
+                </div>
+                <div class="bg-slate-900 p-1 md:p-2 rounded border border-slate-700 min-w-[70px] md:min-w-[110px]">
+                    <div class="text-[9px] md:text-xs text-slate-400 uppercase">Port Dist.</div>
+                    <div id="dist-hud" class="text-sm md:text-xl font-bold text-blue-400">1000 m</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="relative flex-grow min-h-[200px] md:min-h-[300px]">
+            <canvas 
+                id="gameCanvas" 
+                width="800" 
+                height="300" 
+                class="w-full h-full object-cover bg-red-950 block shadow-inner"
+            ></canvas>
+            
+            <!-- Start Menu Overlay -->
+            <div id="start-overlay" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm p-4 z-20">
+                <a href="../" class="arcade-home-link">← All games</a>
+                <h2 class="text-4xl md:text-5xl font-black text-red-500 mb-2 uppercase drop-shadow-lg text-center tracking-widest">RUN!</h2>
+                
+                <div class="flex space-x-2 md:space-x-4 mb-6 mt-4" id="difficulty-btns">
+                    <button data-level="easy" class="diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-slate-800 text-slate-400 hover:bg-slate-700">easy</button>
+                    <button data-level="medium" class="diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.6)] scale-110">medium</button>
+                    <button data-level="hard" class="diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-slate-800 text-slate-400 hover:bg-slate-700">hard</button>
+                </div>
+
+                <p class="text-sm md:text-lg text-slate-300 mb-6 max-w-lg text-center hidden md:block">
+                    Vesuvius has erupted! Tap the correct perfect tense ending to sprint towards the docks. Don't let the pyroclastic cloud catch you!
+                </p>
+                
+                <button 
+                    id="start-btn"
+                    class="px-8 py-3 md:py-4 bg-red-700 hover:bg-red-600 text-white font-bold text-lg md:text-xl rounded-lg shadow-lg hover:shadow-red-500/50 transition-all border-b-4 border-red-900 active:border-b-0 active:translate-y-1 w-full max-w-[250px]"
+                >
+                    ESCAPE
+                </button>
+            </div>
+
+            <!-- Win Overlay -->
+            <div id="win-overlay" class="absolute inset-0 bg-blue-900/90 flex flex-col items-center justify-center backdrop-blur-md z-20 hidden">
+                <h2 class="text-4xl md:text-5xl font-black text-white mb-2 uppercase drop-shadow-lg">SURVIVED</h2>
+                <p class="text-lg md:text-xl text-blue-200 mb-6 font-bold text-center">You reached the ships and escaped Pompeii!</p>
+                <button class="restart-btn px-6 py-3 bg-white text-blue-900 font-bold rounded shadow-lg hover:bg-blue-100 active:scale-95">Play Again</button>
+            </div>
+
+            <!-- Lose Overlay -->
+            <div id="lose-overlay" class="absolute inset-0 bg-black/95 flex flex-col items-center justify-center backdrop-blur-md z-20 hidden">
+                <h2 class="text-4xl md:text-6xl font-black text-red-600 mb-2 uppercase drop-shadow-[0_0_20px_rgba(220,38,38,0.8)]">CONSUMED</h2>
+                <p class="text-lg md:text-xl text-red-300 mb-6 font-bold text-center">The ash cloud overtook you.</p>
+                <button class="restart-btn px-6 py-3 bg-red-900 text-white font-bold rounded shadow-lg border border-red-500 hover:bg-red-700 active:scale-95">Try Again</button>
+            </div>
+        </div>
+
+        <div class="bg-black p-4 md:p-6 shrink-0 border-t-2 border-red-900/50">
+            <div class="max-w-2xl mx-auto flex flex-col items-center w-full">
+                
+                <div id="play-area" class="w-full hidden">
+                    <!-- Prompt -->
+                    <div class="text-center mb-4 md:mb-6">
+                        <div class="text-sm md:text-base font-bold text-slate-500 uppercase tracking-wider mb-1">Translate: <span id="prompt-eng" class="text-white">""</span></div>
+                        <div class="text-2xl md:text-4xl font-black text-white bg-slate-900 px-6 py-2 rounded-xl border border-slate-800 shadow-inner inline-block">
+                            <span id="prompt-stem" class="text-red-500"></span>
+                            <span class="text-slate-600 tracking-widest">_ _ _</span>
+                        </div>
+                    </div>
+
+                    <!-- Tap Grid -->
+                    <div id="tap-grid" class="grid grid-cols-3 gap-3 md:gap-4 w-full">
+                        <!-- Buttons injected via JS -->
+                    </div>
+                </div>
+
+                <div id="waiting-area" class="h-48 flex items-center justify-center text-slate-600 font-bold italic text-center">
+                    Select difficulty to begin your escape
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const verbs = [
+            // 1st Conjugation (amare -> amav-)
+            { eng: "I loved", stem: "amav", ending: "i" },
+            { eng: "you (s.) loved", stem: "amav", ending: "isti" },
+            { eng: "he/she/it loved", stem: "amav", ending: "it" },
+            { eng: "we loved", stem: "amav", ending: "imus" },
+            { eng: "you (pl.) loved", stem: "amav", ending: "istis" },
+            { eng: "they loved", stem: "amav", ending: "erunt" },
+            // 2nd Conjugation (videre -> vid-)
+            { eng: "I saw", stem: "vid", ending: "i" },
+            { eng: "you (s.) saw", stem: "vid", ending: "isti" },
+            { eng: "she saw", stem: "vid", ending: "it" },
+            { eng: "we saw", stem: "vid", ending: "imus" },
+            { eng: "you (pl.) saw", stem: "vid", ending: "istis" },
+            { eng: "they saw", stem: "vid", ending: "erunt" },
+            // 3rd Conjugation (dicere -> dix-)
+            { eng: "I said", stem: "dix", ending: "i" },
+            { eng: "you (s.) said", stem: "dix", ending: "isti" },
+            { eng: "he said", stem: "dix", ending: "it" },
+            { eng: "we said", stem: "dix", ending: "imus" },
+            { eng: "you (pl.) said", stem: "dix", ending: "istis" },
+            { eng: "they said", stem: "dix", ending: "erunt" },
+            // 4th Conjugation (audire -> audiv-)
+            { eng: "I heard", stem: "audiv", ending: "i" },
+            { eng: "you (s.) heard", stem: "audiv", ending: "isti" },
+            { eng: "he heard", stem: "audiv", ending: "it" },
+            { eng: "we heard", stem: "audiv", ending: "imus" },
+            { eng: "you (pl.) heard", stem: "audiv", ending: "istis" },
+            { eng: "they heard", stem: "audiv", ending: "erunt" }
+        ];
+
+        const PERFECT_ENDINGS = ['i', 'isti', 'it', 'imus', 'istis', 'erunt'];
+
+        const ESCAPE_DISTANCE = 50000;
+        const MAX_SPEED = 150;
+
+        const DIFFICULTY_SETTINGS = {
+            easy: { cloudSpeed: 30, friction: 15, boost: 70, penalty: 5 },
+            medium: { cloudSpeed: 45, friction: 20, boost: 55, penalty: 15 },
+            hard: { cloudSpeed: 60, friction: 25, boost: 45, penalty: 25 }
+        };
+
+        let gameState = 'start';
+        let difficulty = 'medium';
+        let currentPrompt = null;
+
+        let config = DIFFICULTY_SETTINGS.medium;
+        let player = { distance: 1000, speed: 0 };
+        let cloud = { distance: 0 };
+        let lastTime = 0;
+        let ashParticles = [];
+        let trackOffset = 0;
+        let animationFrameId;
+
+        // DOM Elements
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const hudContainer = document.getElementById('hud-container');
+        const gapHud = document.getElementById('gap-hud');
+        const distHud = document.getElementById('dist-hud');
+        const startOverlay = document.getElementById('start-overlay');
+        const winOverlay = document.getElementById('win-overlay');
+        const loseOverlay = document.getElementById('lose-overlay');
+        const playArea = document.getElementById('play-area');
+        const waitingArea = document.getElementById('waiting-area');
+        const promptEng = document.getElementById('prompt-eng');
+        const promptStem = document.getElementById('prompt-stem');
+        const tapGrid = document.getElementById('tap-grid');
+
+        function getRandomVerb() {
+            return verbs[Math.floor(Math.random() * verbs.length)];
+        }
+
+        function updateGameState(newState) {
+            gameState = newState;
+            
+            // Manage UI Visibility
+            startOverlay.classList.toggle('hidden', newState !== 'start');
+            winOverlay.classList.toggle('hidden', newState !== 'won');
+            loseOverlay.classList.toggle('hidden', newState !== 'lost');
+            
+            hudContainer.classList.toggle('hidden', newState !== 'running');
+            playArea.classList.toggle('hidden', newState !== 'running');
+            waitingArea.classList.toggle('hidden', newState === 'running');
+            
+            if (newState === 'start' || newState === 'lost' || newState === 'won') {
+                waitingArea.innerText = newState === 'start' ? 'Select difficulty to begin your escape' : 'Waiting...';
+            }
+        }
+
+        function generateTapGrid() {
+            tapGrid.innerHTML = '';
+            PERFECT_ENDINGS.forEach(ending => {
+                const btn = document.createElement('button');
+                btn.className = "relative overflow-hidden bg-slate-800 hover:bg-slate-700 active:bg-slate-900 active:scale-95 text-white font-black text-xl md:text-3xl py-4 md:py-6 rounded-xl border-b-4 border-slate-950 shadow-[inset_0_2px_4px_rgba(255,255,255,0.1)] transition-all select-none touch-manipulation";
+                
+                const span = document.createElement('span');
+                span.className = "relative z-10 lowercase";
+                span.innerText = `-${ending}`;
+                
+                const shine = document.createElement('div');
+                shine.className = "absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/5 to-transparent rounded-t-xl pointer-events-none";
+
+                btn.appendChild(span);
+                btn.appendChild(shine);
+
+                btn.addEventListener('click', () => handleTap(ending));
+                tapGrid.appendChild(btn);
+            });
+        }
+
+        function setupDifficultyButtons() {
+            const btns = document.querySelectorAll('.diff-btn');
+            btns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    difficulty = e.target.getAttribute('data-level');
+                    btns.forEach(b => {
+                        if (b.getAttribute('data-level') === difficulty) {
+                            b.className = "diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.6)] scale-110";
+                        } else {
+                            b.className = "diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-slate-800 text-slate-400 hover:bg-slate-700";
+                        }
+                    });
+                });
+            });
+        }
+
+        function setPrompt(promptObj) {
+            currentPrompt = promptObj;
+            if (currentPrompt) {
+                promptEng.innerText = `"${currentPrompt.eng}"`;
+                promptStem.innerText = currentPrompt.stem;
+            }
+        }
+
+        function handleTap(ending) {
+            if (gameState !== 'running') return;
+            
+            if (ending === currentPrompt.ending) {
+                // Correct answer! Sprint!
+                player.speed = Math.min(player.speed + config.boost, MAX_SPEED);
+                setPrompt(getRandomVerb());
+            } else {
+                // Wrong answer! Stumble!
+                player.speed = Math.max(player.speed - config.penalty, 0);
+            }
+        }
+
+        function startGame() {
+            config = DIFFICULTY_SETTINGS[difficulty];
+            player = { distance: 1000, speed: 0 };
+            cloud = { distance: 0 };
+            
+            updateGameState('running');
+            setPrompt(getRandomVerb());
+            
+            ashParticles = [];
+            for(let i=0; i<50; i++) {
+                createAshParticle(true);
+            }
+            
+            cancelAnimationFrame(animationFrameId);
+            lastTime = performance.now();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function createAshParticle(randomY = false) {
+            ashParticles.push({
+                x: Math.random() * canvas.width,
+                y: randomY ? Math.random() * canvas.height : -10,
+                vx: (Math.random() - 1) * 50 - 20,
+                vy: Math.random() * 50 + 20,
+                size: Math.random() * 3 + 1,
+                color: Math.random() > 0.8 ? '#f59e0b' : '#4b5563'
+            });
+        }
+
+        function drawPlayer(x, y, speed, distance) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            const legSwing = Math.sin(distance * 0.1) * (15 + (speed/10));
+            const armSwing = Math.cos(distance * 0.1) * (15 + (speed/10));
+            const bounce = Math.abs(Math.sin(distance * 0.1)) * 3;
+
+            ctx.translate(0, -bounce);
+
+            // Back Arm
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#e2c6a9';
+            ctx.beginPath();
+            ctx.moveTo(0, -20); ctx.lineTo(-armSwing, -5);
+            ctx.stroke();
+
+            // Back Leg
+            ctx.strokeStyle = '#e2c6a9';
+            ctx.beginPath();
+            ctx.moveTo(0, 10); ctx.lineTo(-legSwing, 30);
+            ctx.stroke();
+
+            // Body
+            ctx.fillStyle = '#f3f4f6';
+            ctx.beginPath();
+            ctx.moveTo(-5, -20);
+            ctx.lineTo(5, -20);
+            ctx.lineTo(10, 15);
+            ctx.lineTo(-10, 15);
+            ctx.fill();
+            
+            // Belt
+            ctx.fillStyle = '#8b5a2b';
+            ctx.fillRect(-8, 0, 16, 3);
+
+            // Front Leg
+            ctx.strokeStyle = '#d6bc98';
+            ctx.beginPath();
+            ctx.moveTo(0, 10); ctx.lineTo(legSwing, 30);
+            ctx.stroke();
+
+            // Front Arm
+            ctx.strokeStyle = '#d6bc98';
+            ctx.beginPath();
+            ctx.moveTo(0, -20); ctx.lineTo(armSwing, -10);
+            ctx.stroke();
+
+            // Head
+            ctx.fillStyle = '#e2c6a9';
+            ctx.beginPath();
+            ctx.arc(2, -28, 7, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawCloud(x, height, time) {
+            ctx.save();
+            
+            const grad = ctx.createLinearGradient(x - 300, 0, x, 0);
+            grad.addColorStop(0, '#000000');
+            grad.addColorStop(0.7, '#1f0d0d');
+            grad.addColorStop(0.9, '#450a0a');
+            grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, x, height);
+
+            ctx.fillStyle = '#1a0505';
+            for(let i = 0; i < height; i += 40) {
+                const offset = Math.sin((time/200) + i) * 15;
+                const pulse = Math.cos((time/150) + i) * 5;
+                
+                ctx.beginPath();
+                ctx.arc(x - 20 + offset, i + 20, 40 + pulse, 0, Math.PI*2);
+                ctx.fill();
+
+                if (i % 80 === 0) {
+                    ctx.fillStyle = 'rgba(245, 158, 11, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(x - 10 + offset, i + 20, 20 + pulse, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = '#1a0505'; 
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function gameLoop(time) {
+            if (gameState !== 'running' && gameState !== 'start') return; 
+            
+            const rawDelta = (time - lastTime) / 1000;
+            const delta = Math.min(rawDelta, 0.1); 
+            lastTime = time;
+
+            // Physics Update
+            if (gameState === 'running') {
+                player.speed = Math.max(player.speed - (config.friction * delta), 0);
+                player.distance += player.speed * delta * 10; 
+                cloud.distance += config.cloudSpeed * delta * 10;
+                trackOffset = (trackOffset + player.speed * delta * 10) % 400;
+
+                if (Math.random() < 0.3) createAshParticle();
+
+                const gap = player.distance - cloud.distance;
+                distHud.innerText = `${Math.max(0, Math.floor((ESCAPE_DISTANCE - player.distance) / 10))} m`;
+                
+                gapHud.innerText = `${Math.floor(gap / 10)} m`;
+                gapHud.className = `text-sm md:text-xl font-bold ${gap < 1500 ? 'text-red-500 animate-pulse' : 'text-amber-500'}`;
+
+                if (gap <= 0) {
+                    updateGameState('lost');
+                    return; 
+                }
+                
+                if (player.distance >= ESCAPE_DISTANCE) {
+                    updateGameState('won');
+                    return; 
+                }
+            }
+
+            // Rendering
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Sky
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+            skyGrad.addColorStop(0, '#450a0a');
+            skyGrad.addColorStop(1, '#991b1b');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Background Parallax
+            ctx.fillStyle = '#270808';
+            for(let i = 0; i < width + 400; i += 200) {
+                const pillarX = i - trackOffset;
+                ctx.fillRect(pillarX, height - 120, 30, 100);
+                ctx.fillRect(pillarX - 5, height - 120, 40, 10);
+                ctx.fillRect(pillarX - 10, height - 20, 50, 20);
+            }
+
+            // Ground
+            ctx.fillStyle = '#1c1917';
+            ctx.fillRect(0, height - 20, width, 20);
+
+            // Screen Positioning
+            const distToFinish = ESCAPE_DISTANCE - player.distance;
+            let cameraX = player.distance - (width * 0.4); 
+            
+            if (distToFinish < width * 0.6) {
+                cameraX = ESCAPE_DISTANCE - (width * 0.9);
+            }
+
+            const playerScreenX = player.distance - cameraX;
+            const cloudScreenX = cloud.distance - cameraX;
+            const portScreenX = ESCAPE_DISTANCE - cameraX;
+
+            // Docks
+            if (portScreenX < width + 200) {
+                ctx.fillStyle = '#1e3a8a';
+                ctx.fillRect(portScreenX, height - 30, width, 30);
+                ctx.fillStyle = '#451a03';
+                ctx.fillRect(portScreenX, height - 40, 150, 20);
+                ctx.fillStyle = '#78350f';
+                ctx.fillRect(portScreenX + 80, height - 150, 8, 110);
+                ctx.fillStyle = '#fef3c7';
+                ctx.beginPath();
+                ctx.moveTo(portScreenX + 85, height - 140);
+                ctx.lineTo(portScreenX + 140, height - 100);
+                ctx.lineTo(portScreenX + 85, height - 60);
+                ctx.fill();
+            }
+
+            if (gameState !== 'lost') {
+                drawPlayer(playerScreenX, height - 50, player.speed, player.distance);
+            }
+
+            drawCloud(cloudScreenX, height, time);
+
+            // Particles
+            for(let i = ashParticles.length - 1; i >= 0; i--) {
+                const pt = ashParticles[i];
+                pt.x += pt.vx * delta - (gameState === 'running' ? player.speed * delta * 2 : 0);
+                pt.y += pt.vy * delta;
+                
+                if (pt.y > height || pt.x < 0) {
+                    ashParticles.splice(i, 1);
+                } else {
+                    ctx.fillStyle = pt.color;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+
+            if (gameState === 'running' || gameState === 'start') {
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function init() {
+            generateTapGrid();
+            setupDifficultyButtons();
+
+            document.getElementById('start-btn').addEventListener('click', startGame);
+            document.querySelectorAll('.restart-btn').forEach(btn => {
+                btn.addEventListener('click', () => updateGameState('start'));
+            });
+
+            // Initial visual state
+            for(let i=0; i<50; i++) createAshParticle(true);
+            lastTime = performance.now();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Start the engine
+        window.onload = init;
+
+    </script>
+</body>
+</html>

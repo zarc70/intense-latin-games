@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circus Maximus Grammaticus</title>
+    <link rel="stylesheet" href="tailwind.css">
+    <style>
+        /* Custom font and basic styling to prevent scrolling on mobile */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0f172a; /* slate-900 */
+            color: white;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            touch-action: manipulation;
+        }
+        
+        /* Remove default input styling */
+        input:focus { outline: none; }
+
+        .arcade-home-link {
+            display: inline-block;
+            margin-bottom: 0.65rem;
+            color: #fbbf24;
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-decoration: none;
+            text-transform: uppercase;
+        }
+        .arcade-home-link:hover,
+        .arcade-home-link:focus-visible { color: #fde68a; text-decoration: underline; }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-2 md:p-4">
+
+    <div class="max-w-4xl w-full bg-slate-800 rounded-2xl border-4 border-amber-600 shadow-2xl shadow-amber-900/50 overflow-hidden flex flex-col h-[95vh] md:h-auto">
+        
+        <!-- Header / HUD -->
+        <div class="bg-slate-950 p-3 md:p-4 border-b-2 border-amber-700 flex justify-between items-center px-2 md:px-8 shrink-0">
+            <div class="flex items-center space-x-2 md:space-x-4">
+                <div class="text-2xl md:text-3xl">🏛️</div>
+                <div>
+                    <h1 class="text-sm md:text-2xl font-black text-amber-500 uppercase tracking-widest leading-tight">Circus Maximus</h1>
+                    <h2 class="text-[10px] md:text-sm text-slate-400 font-bold tracking-widest hidden md:block">7-Lap Endurance Race</h2>
+                </div>
+            </div>
+            
+            <div id="hud-container" class="hidden flex space-x-1 md:space-x-4 text-center">
+                <div class="bg-slate-800 p-1 md:p-2 rounded border border-slate-600 min-w-[50px] md:min-w-[90px]">
+                    <div class="text-[9px] md:text-xs text-slate-400 uppercase">Lap</div>
+                    <div id="lap-hud" class="text-xs md:text-xl font-bold text-white">LAP 1 / 7</div>
+                </div>
+                <div class="bg-slate-800 p-1 md:p-2 rounded border border-slate-600 min-w-[60px] md:min-w-[100px]">
+                    <div class="text-[9px] md:text-xs text-slate-400 uppercase">Speed</div>
+                    <div id="speed-hud" class="text-xs md:text-xl font-bold text-amber-400">0 mph</div>
+                </div>
+                <div class="bg-slate-800 p-1 md:p-2 rounded border border-slate-600 min-w-[60px] md:min-w-[100px]">
+                    <div class="text-[9px] md:text-xs text-slate-400 uppercase">Dist Left</div>
+                    <div id="dist-hud" class="text-xs md:text-xl font-bold text-blue-400">1000 m</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Canvas Area -->
+        <div class="relative flex-grow min-h-[250px] md:min-h-[300px]">
+            <canvas id="gameCanvas" width="800" height="300" class="w-full h-full object-cover bg-amber-900 block shadow-inner"></canvas>
+            
+            <!-- Start Menu Overlay -->
+            <div id="start-overlay" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm p-4 z-10">
+                <a href="../" class="arcade-home-link">← All games</a>
+                <h2 class="text-3xl md:text-4xl font-black text-white mb-2 uppercase drop-shadow-lg text-center">7-Lap Endurance</h2>
+                
+                <div class="flex flex-wrap justify-center gap-2 md:gap-4 mb-6 mt-4" id="difficulty-buttons">
+                    <button data-diff="easy" class="diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-slate-700 text-slate-400 hover:bg-slate-600">Easy</button>
+                    <button data-diff="medium" class="diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.6)] scale-110">Medium</button>
+                    <button data-diff="hard" class="diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-slate-700 text-slate-400 hover:bg-slate-600">Hard</button>
+                    <button data-diff="expert" class="diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-slate-700 text-slate-400 hover:bg-slate-600">Expert</button>
+                </div>
+
+                <p class="text-sm md:text-lg text-slate-300 mb-6 max-w-lg text-center hidden md:block">
+                    A grueling 7-lap marathon! Type the correct present tense ending to whip your horses. Cross the golden lap line 7 times to win.
+                </p>
+                
+                <button id="start-btn" class="px-8 py-3 md:py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold text-lg md:text-xl rounded-lg shadow-lg hover:shadow-amber-500/50 transition-all border-b-4 border-amber-800 active:border-b-0 active:translate-y-1 w-full max-w-[250px]">
+                    START RACE
+                </button>
+            </div>
+
+            <!-- Win Overlay -->
+            <div id="win-overlay" class="hidden absolute inset-0 bg-amber-600/90 flex flex-col items-center justify-center backdrop-blur-md z-10">
+                <h2 class="text-4xl md:text-5xl font-black text-white mb-2 uppercase drop-shadow-lg">VICTORIA!</h2>
+                <p class="text-lg md:text-xl text-amber-100 mb-6 font-bold text-center">You conquered the 7-lap marathon!</p>
+                <button class="menu-btn px-6 py-3 bg-white text-amber-700 font-bold rounded shadow-lg hover:bg-amber-100 active:scale-95">Main Menu</button>
+            </div>
+
+            <!-- Lose Overlay -->
+            <div id="lose-overlay" class="hidden absolute inset-0 bg-red-900/90 flex flex-col items-center justify-center backdrop-blur-md z-10">
+                <h2 class="text-4xl md:text-5xl font-black text-white mb-2 uppercase drop-shadow-lg">DEFEAT</h2>
+                <p class="text-lg md:text-xl text-red-200 mb-6 font-bold text-center">You fell behind in the endurance race.</p>
+                <button class="menu-btn px-6 py-3 bg-black text-white font-bold rounded shadow-lg border border-red-500 hover:bg-red-800 active:scale-95">Main Menu</button>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="bg-slate-900 p-4 md:p-8 shrink-0">
+            <div class="max-w-2xl mx-auto h-32 md:h-48 relative">
+                
+                <!-- Active Prompt Area -->
+                <div id="prompt-area" class="hidden flex flex-col items-center">
+                    <div class="text-sm md:text-lg font-bold text-slate-400 mb-1 uppercase tracking-wider">Translate to Latin</div>
+                    <div id="english-prompt" class="text-2xl md:text-4xl font-black text-white mb-4">"I love"</div>
+                    
+                    <div class="flex items-center text-4xl md:text-5xl font-bold bg-slate-800 p-2 md:p-4 rounded-xl shadow-inner border border-slate-700">
+                        <span id="latin-stem" class="text-amber-400 mr-1">am</span>
+                        <input
+                            id="type-input"
+                            type="text"
+                            autocapitalize="none"
+                            autocomplete="off"
+                            autocorrect="off"
+                            spellcheck="false"
+                            class="w-24 md:w-32 bg-slate-950 text-white rounded border-2 border-slate-600 outline-none focus:border-amber-500 px-2 py-1 shadow-inner text-center lowercase"
+                            placeholder="..."
+                            maxlength="4"
+                        />
+                    </div>
+                    <p class="text-slate-500 mt-4 text-xs md:text-sm font-bold text-center">
+                        Type the ending without a hyphen (o, s, t, mus, tis, nt)<br class="md:hidden" /> and press <span class="text-amber-500 bg-amber-500/10 px-2 py-1 rounded">ENTER</span>
+                    </p>
+                </div>
+                
+                <!-- Waiting text -->
+                <div id="waiting-text" class="absolute inset-0 flex items-center justify-center text-slate-600 font-bold italic text-center">
+                    Select a difficulty to begin the endurance race
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DATA & CONSTANTS ---
+        const verbs = [
+            { eng: "I love", stem: "am", ending: "o" }, { eng: "you (s.) love", stem: "ama", ending: "s" },
+            { eng: "he/she/it loves", stem: "ama", ending: "t" }, { eng: "we love", stem: "ama", ending: "mus" },
+            { eng: "y'all love", stem: "ama", ending: "tis" }, { eng: "they love", stem: "ama", ending: "nt" },
+            { eng: "I see", stem: "vide", ending: "o" }, { eng: "you (s.) see", stem: "vide", ending: "s" },
+            { eng: "she sees", stem: "vide", ending: "t" }, { eng: "we see", stem: "vide", ending: "mus" },
+            { eng: "y'all see", stem: "vide", ending: "tis" }, { eng: "they see", stem: "vide", ending: "nt" },
+            { eng: "I say", stem: "dic", ending: "o" }, { eng: "you (s.) say", stem: "dici", ending: "s" },
+            { eng: "he says", stem: "dici", ending: "t" }, { eng: "we say", stem: "dici", ending: "mus" },
+            { eng: "y'all say", stem: "dici", ending: "tis" }, { eng: "they say", stem: "dicu", ending: "nt" },
+            { eng: "I hear", stem: "audi", ending: "o" }, { eng: "you (s.) hear", stem: "audi", ending: "s" },
+            { eng: "he hears", stem: "audi", ending: "t" }, { eng: "we hear", stem: "audi", ending: "mus" },
+            { eng: "y'all hear", stem: "audi", ending: "tis" }, { eng: "they hear", stem: "audiu", ending: "nt" }
+        ];
+
+        const LAP_LENGTH = 10000;
+        const TOTAL_LAPS = 7;
+        const RACE_LENGTH = LAP_LENGTH * TOTAL_LAPS;
+        const MAX_SPEED = 180;
+
+        const DIFFICULTY_SETTINGS = {
+            easy: { friction: 8, boost: 50, penalty: 10, aiSpeeds: [40, 45, 50] },
+            medium: { friction: 12, boost: 45, penalty: 15, aiSpeeds: [55, 60, 65] },
+            hard: { friction: 16, boost: 40, penalty: 20, aiSpeeds: [70, 75, 80] },
+            expert: { friction: 16, boost: 20, penalty: 40, aiSpeeds: [120, 130, 140] }
+        };
+
+        // --- GAME STATE ---
+        let gameState = 'start'; // 'start', 'racing', 'won', 'lost'
+        let currentDifficulty = 'medium';
+        let config = DIFFICULTY_SETTINGS.medium;
+        let currentPrompt = null;
+        
+        let player = { distance: 0, speed: 0, lap: 1 };
+        let opponents = [];
+        
+        let lastTime = 0;
+        let animationId;
+        let particles = [];
+        let trackOffset = 0;
+
+        // --- DOM ELEMENTS ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const ui = {
+            startOverlay: document.getElementById('start-overlay'),
+            winOverlay: document.getElementById('win-overlay'),
+            loseOverlay: document.getElementById('lose-overlay'),
+            hudContainer: document.getElementById('hud-container'),
+            lapHud: document.getElementById('lap-hud'),
+            speedHud: document.getElementById('speed-hud'),
+            distHud: document.getElementById('dist-hud'),
+            promptArea: document.getElementById('prompt-area'),
+            waitingText: document.getElementById('waiting-text'),
+            englishPrompt: document.getElementById('english-prompt'),
+            latinStem: document.getElementById('latin-stem'),
+            typeInput: document.getElementById('type-input'),
+            startBtn: document.getElementById('start-btn'),
+            diffBtns: document.querySelectorAll('.diff-btn'),
+            menuBtns: document.querySelectorAll('.menu-btn')
+        };
+
+        // --- STREAMING_CHUNK:Setting up Event Listeners... ---
+        
+        // Handle window resize for canvas scaling
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Difficulty Selection
+        ui.diffBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                currentDifficulty = e.target.dataset.diff;
+                // Reset styles
+                ui.diffBtns.forEach(b => {
+                    b.className = "diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-slate-700 text-slate-400 hover:bg-slate-600";
+                });
+                // Highlight selected
+                e.target.className = "diff-btn px-4 py-2 rounded-lg font-bold uppercase transition-all bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.6)] scale-110";
+            });
+        });
+
+        // Start Game
+        ui.startBtn.addEventListener('click', startGame);
+
+        // Menu Buttons
+        ui.menuBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                setGameState('start');
+            });
+        });
+
+        // Input Handling
+        ui.typeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && gameState === 'racing') {
+                const val = ui.typeInput.value.toLowerCase().trim().replace(/^-/, '');
+                if (val === currentPrompt.ending) {
+                    // Correct!
+                    player.speed = Math.min(player.speed + config.boost, MAX_SPEED);
+                    createBoostParticles();
+                    setNewPrompt();
+                    ui.typeInput.value = '';
+                } else {
+                    // Wrong!
+                    player.speed = Math.max(player.speed - config.penalty, 0);
+                    ui.typeInput.value = '';
+                }
+            }
+        });
+
+        // Re-focus input on click if racing
+        document.addEventListener('click', () => {
+            if (gameState === 'racing') ui.typeInput.focus();
+        });
+
+
+        // --- STREAMING_CHUNK:Core Game Functions... ---
+
+        function setGameState(newState) {
+            gameState = newState;
+            
+            // Hide all overlays first
+            ui.startOverlay.classList.add('hidden');
+            ui.winOverlay.classList.add('hidden');
+            ui.loseOverlay.classList.add('hidden');
+            ui.hudContainer.classList.add('hidden');
+            ui.promptArea.classList.add('hidden');
+            ui.waitingText.classList.add('hidden');
+            ui.typeInput.disabled = true;
+
+            if (newState === 'start') {
+                ui.startOverlay.classList.remove('hidden');
+                ui.waitingText.classList.remove('hidden');
+                ui.waitingText.innerText = 'Select a difficulty to begin the endurance race';
+                // Start idle animation loop if not running
+                if(!animationId) {
+                    lastTime = performance.now();
+                    animationId = requestAnimationFrame(gameLoop);
+                }
+            } 
+            else if (newState === 'racing') {
+                ui.hudContainer.classList.remove('hidden');
+                ui.promptArea.classList.remove('hidden');
+                ui.typeInput.disabled = false;
+                ui.typeInput.focus();
+            }
+            else if (newState === 'won') {
+                ui.winOverlay.classList.remove('hidden');
+                ui.waitingText.classList.remove('hidden');
+                ui.waitingText.innerText = 'Waiting...';
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            else if (newState === 'lost') {
+                ui.loseOverlay.classList.remove('hidden');
+                ui.waitingText.classList.remove('hidden');
+                ui.waitingText.innerText = 'Waiting...';
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        }
+
+        function setNewPrompt() {
+            const index = Math.floor(Math.random() * verbs.length);
+            currentPrompt = verbs[index];
+            ui.englishPrompt.innerText = `"${currentPrompt.eng}"`;
+            ui.latinStem.innerText = currentPrompt.stem;
+        }
+
+        function startGame() {
+            config = DIFFICULTY_SETTINGS[currentDifficulty];
+            
+            player = { distance: 0, speed: 0, lap: 1 };
+            opponents = [
+                { id: 'Reds', distance: 0, speed: config.aiSpeeds[0], baseSpeed: config.aiSpeeds[0], color: '#e53e3e', yOffset: -60 },
+                { id: 'Whites', distance: 0, speed: config.aiSpeeds[1], baseSpeed: config.aiSpeeds[1], color: '#f7fafc', yOffset: -20 },
+                { id: 'Greens', distance: 0, speed: config.aiSpeeds[2], baseSpeed: config.aiSpeeds[2], color: '#38a169', yOffset: 60 }
+            ];
+            
+            particles = [];
+            trackOffset = 0;
+            
+            setNewPrompt();
+            ui.typeInput.value = '';
+            
+            setGameState('racing');
+            
+            // Restart loop if it was dead
+            if(!animationId) {
+                lastTime = performance.now();
+                animationId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function createBoostParticles() {
+            for(let i=0; i<15; i++){
+                particles.push({
+                    x: 100,
+                    y: canvas.height / 2, 
+                    vx: (Math.random() - 1) * 200,
+                    vy: (Math.random() - 0.5) * 100,
+                    life: 1.0,
+                    color: '#d6bc98'
+                });
+            }
+        }
+
+        // --- STREAMING_CHUNK:Canvas Rendering & Animation Loop... ---
+
+        function drawChariot(ctx, x, y, color, isPlayer = false) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Dust trailing
+            ctx.fillStyle = 'rgba(214, 188, 152, 0.4)';
+            ctx.beginPath();
+            ctx.arc(-40, 10, 15 + Math.random()*5, 0, Math.PI*2);
+            ctx.arc(-20, 15, 10 + Math.random()*5, 0, Math.PI*2);
+            ctx.fill();
+
+            // Horses
+            ctx.fillStyle = '#4a3f35'; 
+            ctx.fillRect(20, -10, 40, 15); 
+            ctx.fillRect(50, -25, 15, 20); 
+            
+            const dist = isPlayer ? player.distance : (opponents[0]?.distance || 0);
+            const legSwing = Math.sin(dist * 0.1) * 10;
+            
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#3a2f25';
+            ctx.beginPath();
+            ctx.moveTo(30, 5); ctx.lineTo(30 + legSwing, 25);
+            ctx.moveTo(50, 5); ctx.lineTo(50 - legSwing, 25);
+            ctx.stroke();
+
+            // Chariot base
+            ctx.fillStyle = '#8b5a2b';
+            ctx.beginPath();
+            ctx.roundRect(-20, -15, 30, 30, 5);
+            ctx.fill();
+            
+            ctx.fillStyle = color;
+            ctx.fillRect(-15, -10, 20, 20);
+
+            // Driver
+            ctx.fillStyle = '#e2c6a9'; 
+            ctx.beginPath();
+            ctx.arc(-5, -25, 8, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = color;
+            ctx.fillRect(-10, -18, 10, 15);
+            
+            // Whip
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, -15);
+            ctx.quadraticCurveTo(20, -30 - Math.random()*10, 40, -10);
+            ctx.stroke();
+
+            // Wheel
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(-5, 10, 12, 0, Math.PI*2);
+            ctx.stroke();
+            ctx.lineWidth = 1;
+            const rot = dist * 0.05;
+            for(let i=0; i<4; i++){
+                const angle = rot + (i * Math.PI/2);
+                ctx.beginPath();
+                ctx.moveTo(-5, 10);
+                ctx.lineTo(-5 + Math.cos(angle)*12, 10 + Math.sin(angle)*12);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function gameLoop(time) {
+            // Calculate Delta (max 0.1 to prevent jumping)
+            const rawDelta = (time - lastTime) / 1000;
+            const delta = Math.min(rawDelta, 0.1); 
+            lastTime = time;
+
+            // Update Canvas Dimensions dynamically
+            const width = canvas.width;
+            const height = canvas.height;
+
+            // --- PHYSICS ---
+            if (gameState === 'racing') {
+                player.speed = Math.max(player.speed - (config.friction * delta), 0);
+                player.distance += player.speed * delta * 10; 
+                player.lap = Math.min(TOTAL_LAPS, Math.floor(player.distance / LAP_LENGTH) + 1);
+                
+                opponents.forEach(op => {
+                    const speedVariance = (Math.random() - 0.5) * 10;
+                    op.speed = op.baseSpeed + speedVariance;
+                    op.distance += op.speed * delta * 10;
+                });
+
+                trackOffset = (trackOffset + player.speed * delta * 10) % 100;
+
+                // Update HUD Strings
+                ui.speedHud.innerText = `${Math.floor(player.speed)} mph`;
+                ui.lapHud.innerText = `LAP ${player.lap} / ${TOTAL_LAPS}`;
+                
+                const lapDistLeft = LAP_LENGTH - (player.distance % LAP_LENGTH);
+                const finalLapDistLeft = RACE_LENGTH - player.distance;
+                ui.distHud.innerText = `${Math.max(0, Math.floor((player.lap === TOTAL_LAPS ? finalLapDistLeft : lapDistLeft) / 10))} m`;
+
+                // Win/Loss Checks
+                if (player.distance >= RACE_LENGTH) {
+                    const enemiesAhead = opponents.filter(op => op.distance > player.distance);
+                    if (enemiesAhead.length === 0) setGameState('won');
+                    else setGameState('lost');
+                    return; 
+                }
+                
+                const enemiesFinished = opponents.filter(op => op.distance >= RACE_LENGTH);
+                if (enemiesFinished.length > 0 && player.distance < RACE_LENGTH - 500) {
+                    setGameState('lost');
+                    return; 
+                }
+            }
+
+            // --- DRAWING ---
+            ctx.fillStyle = '#c8a165';
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw track lines
+            ctx.strokeStyle = '#a6824a';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([20, 20]);
+            for(let y = Math.floor(height * 0.1); y < height; y += Math.floor(height * 0.15)) {
+                ctx.beginPath();
+                ctx.moveTo(-trackOffset, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]); 
+
+            const playerX = width * 0.2; 
+            const playerY = height / 2;
+
+            // Draw Checkpoint Lines
+            const nextLapLineDistance = Math.floor(player.distance / LAP_LENGTH) * LAP_LENGTH + LAP_LENGTH;
+            const distToNextLine = nextLapLineDistance - player.distance;
+            
+            if (distToNextLine < width) {
+                const lineX = playerX + distToNextLine;
+                const isFinish = nextLapLineDistance >= RACE_LENGTH;
+                
+                ctx.fillStyle = isFinish ? '#fff' : '#fbbf24'; 
+                ctx.fillRect(lineX, 0, 20, height);
+                ctx.fillStyle = '#000';
+                
+                for(let i=0; i<height; i+=20){
+                    ctx.fillRect(lineX, i, 10, 10);
+                    ctx.fillRect(lineX+10, i+10, 10, 10);
+                }
+            }
+
+            // Prepare Entities
+            const entities = [
+                { type: 'player', dist: player.distance, y: playerY, color: '#2b6cb0' },
+                ...opponents.map(op => ({ type: 'ai', dist: op.distance, y: playerY + (op.yOffset * (height/300)), color: op.color }))
+            ];
+            
+            entities.sort((a, b) => a.y - b.y);
+
+            // Draw Entities
+            entities.forEach(ent => {
+                const relDist = ent.dist - player.distance;
+                const screenX = playerX + relDist;
+                if (screenX > -100 && screenX < width + 100) {
+                    drawChariot(ctx, screenX, ent.y, ent.color, ent.type === 'player');
+                }
+            });
+
+            // Particles
+            for(let i = particles.length - 1; i >= 0; i--) {
+                const pt = particles[i];
+                pt.x += pt.vx * delta - (player.speed * delta * 10); 
+                pt.y += pt.vy * delta;
+                pt.life -= delta * 2;
+                
+                if (pt.life <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${pt.life})`;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, 3, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+
+            // Loop Call
+            if (gameState === 'racing' || gameState === 'start') {
+                animationId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Initialize on Load
+        window.onload = function() {
+            resizeCanvas();
+            setGameState('start');
+        };
+
+    </script>
+</body>
+</html>
